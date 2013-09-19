@@ -121,6 +121,46 @@
  #f
  "mino-intersect")
 
+(define (mino-rotate mino rotor)
+  (map (lambda (point) (point-rotate point rotor)) mino)) 
+
+(check-equal? 
+ (mino-rotate 
+  (make-mino (make-point 1 0 1) (make-point 0 0 1) (make-point 1 1 1) (make-point 1 2 1))
+  '(0 0 1))
+ (make-mino (make-point 0 1 1) (make-point 0 0 1) (make-point -1 1 1) (make-point -2 1 1))
+ "mino-rotate")
+
+(check-equal?
+ (mino-rotate 
+  (make-mino 
+   (make-point 1 0 1) (make-point 0 0 1) (make-point 1 1 1) (make-point 1 2 1))
+  '(1 0 0))
+ (make-mino (make-point 1 -1 0) (make-point 0 -1 0) (make-point 1 -1 1) (make-point 1 -1 2))
+ "mino-rotate")
+
+(define (mino-shift mino shiftor)
+  (map (lambda (point) (point-shift point shiftor)) mino))
+
+(check-equal? 
+ (mino-shift 
+  (make-mino (make-point 1 0 1) (make-point 0 0 1) (make-point 1 1 1) (make-point 1 2 1))
+  '(0 1 2))
+ (make-mino (make-point 1 1 3) (make-point 0 1 3) (make-point 1 2 3) (make-point 1 3 3))
+ "mino-shift")
+
+(define (mino-transform mino transformer)
+  (mino-shift 
+   (mino-rotate mino (transformer-rotor transformer))
+   (transformer-shiftor transformer)))
+
+(check-equal? 
+ (mino-transform 
+  (make-mino (make-point 1 0 1) (make-point 0 0 1) (make-point 1 1 1) (make-point 1 2 1))
+  (make-transformer '(1 0 0) '(0 1 2)))
+ (make-mino (make-point 1 0 2) (make-point 0 0 2) (make-point 1 0 3) (make-point 1 0 4))
+ "mino-transform")
+
 
 (define (mino-box mino)
   (map
@@ -133,12 +173,6 @@
   (make-mino (make-point 0 0 0) (make-point 0 0 1) (make-point 1 0 0) (make-point 0 1 0)))
  (make-box (make-interval 0 1) (make-interval 0 1) (make-interval 0 1))
  "mino-box")
-
-
-;(define (mino-interval mino coord)
-;   ((lambda (l)
-;     (make-interval (apply min l) (apply max l)))
-;    (point-coord (transpose-lists mino) coord)))
 
 (define (mino-interval mino coord)
   (let ((coords (point-coord (transpose-lists mino) coord)))
@@ -157,13 +191,21 @@
 (define (interval-overstep? overstepper overstepped)
   (> (interval-upper overstepper) (interval-upper overstepped)))
 
-(define (mino-init-shiftor-1 mino game-interval coord) 
-  (let ((res (- (interval-lower game-interval)
-                (interval-lower (mino-interval mino coord)))))
-        (if (> (interval-upper (mino-interval mino coord)) 
-               (interval-upper game-interval))
-            '()
-            res)))
+;(define (mino-init-shiftor-1 mino game-interval coord)
+;  (let ((res (- (interval-lower game-interval)
+;                (interval-lower (mino-interval mino coord)))))
+;        (if (> (interval-upper (mino-interval mino coord)) 
+;               (interval-upper game-interval))
+;            '()
+;            res)))
+
+
+(define (mino-init-shiftor-1 mino game-interval coord)
+  (let ((mi (mino-interval mino coord)))
+    (if (interval-overstep? mi game-interval)
+        null
+        (- (interval-lower game-interval)
+           (interval-lower mi)))))
 
 (check-equal? 
  (mino-init-shiftor-1
@@ -175,17 +217,19 @@
 (check-equal?
  (mino-init-shiftor-1
   (make-mino (make-point 1 0 1) (make-point 0 0 1) (make-point 1 1 1) (make-point 1 2 1))
-  (make-interval 0 3)
+  (make-interval 0 2)
   2)
  -1
  "mino-init-shiftor-1")
 
 (define (mino-init-shiftor mino gamebox)
   (let ((res 
-         (map (lambda (coord) (mino-init-shiftor-1 mino (box-interval gamebox coord) coord))
-              coords)))
-    (if (member  '() res)
-        '()
+         (map 
+          (lambda (coord) 
+            (mino-init-shiftor-1 mino (box-interval gamebox coord) coord))
+          coords)))
+    (if (member null res)
+        null
         res)))
 
 (check-equal? 
@@ -198,20 +242,78 @@
 (check-equal?
  (mino-init-shiftor
   (make-mino (make-point 1 0 1) (make-point 0 0 1) (make-point 1 1 1) (make-point 1 2 1))
-  (make-box (make-interval 0 3) (make-interval 0 3) (make-interval 0 3)))
+  (make-box (make-interval 0 2) (make-interval 0 2) (make-interval 0 2)))
  '(0 0 -1)
  "mino-init-shiftor")
 
-(define (mino-init-transformer mino gamebox)
-  (let* ((init-shiftor (mino-init-shiftor mino gamebox))
-         (init-transformer (make-transformer '(0 0 0) init-shiftor)))
-    (if (not (null? init-shiftor))
-        init-transformer
-        (mino-next-transformer 
-         mino gamebox       
-         (make-transformer '(0 0 0) 
-                           (map - (box-upper-corner gamebox) 
-                                (box-lower-corner (mino-box mino))))))))
+(define (next-rotor rotor)
+  (define (aux rotor coord)
+    (if (> coord 2)
+        null
+        (let ((power (point-coord rotor coord)))
+          (if (< power 3)
+              (change-n-first coord 
+                              (change-nth coord rotor (+ 1 power))
+                              (lambda (n) 0))
+              (aux rotor (+ coord 1))))))
+  (aux rotor 0))
+
+(check-equal? (next-rotor '(2 1 2)) '(3 1 2) "next-rotor")
+(check-equal? (next-rotor '(3 0 0)) '(0 1 0) "next-rotor")
+
+(define (mino-next-rotor current-rotor mino gamebox)
+  (let ((next-rotor (next-rotor current-rotor)))
+    (cond ((null? next-rotor) null)
+          ((not (null? (mino-init-shiftor (mino-rotate mino next-rotor) gamebox)))
+            next-rotor)
+          (else (mino-next-rotor next-rotor mino gamebox)))))
+
+(check-equal? 
+ (mino-next-rotor
+  '(0 0 0)
+  (make-mino (make-point 0 0 0) (make-point 1 0 0))
+  '((0 0) (0 0) (0 1)))
+ '(0 1 0)
+ "mino-next-rotor")
+  
+(check-equal? 
+ (mino-next-rotor
+  '(3 3 3)
+  (make-mino (make-point 0 0 0) (make-point 1 0 0))
+  '((0 0) (0 0) (0 1)))
+ null
+ "mino-next-rotor")
+
+(define (mino-init-rotor mino gamebox)
+    (if (not (null? (mino-init-shiftor mino gamebox)))
+        '(0 0 0)
+        (mino-next-rotor '(0 0 0) mino gamebox)))
+
+(check-equal? 
+ (mino-init-rotor
+  (make-mino (make-point 0 0 0) (make-point 1 0 0))
+  '((0 0) (0 0) (0 1)))
+ '(0 1 0)
+ "mino-init-rotor")
+
+(check-equal?
+ (mino-init-rotor
+  (make-mino (make-point 1 0 1) (make-point 0 0 1) (make-point 1 1 1) (make-point 1 2 1))
+  (make-box (make-interval 0 2) (make-interval 0 2) (make-interval 0 2)))
+ '(0 0 0)
+ "mino-init-rotor")
+
+;(define (mino-init-transformer mino gamebox)
+;  (let* ((init-shiftor (mino-init-shiftor mino gamebox))
+;         (init-transformer (make-transformer '(0 0 0) init-shiftor)))
+;    (if (not (null? init-shiftor))
+;        init-transformer
+;        (mino-next-transformer 
+;         mino gamebox       
+;         (make-transformer '(0 0 0)
+;                           (map - (box-upper-corner gamebox) 
+;                                (box-lower-corner (mino-box mino))))))))
+
 
 (define (mino-next-shiftor-1 mino gamebox coord current)
   (let ((next (+ current 1)))
@@ -315,79 +417,19 @@
  "mino-next-shiftor")
  
 
-(define (next-rotor rotor)
-  (define (aux rotor coord)
-    (if (> coord 2)
-        null
-        (let ((power (point-coord rotor coord)))
-          (if (< power 3)
-              (change-n-first coord 
-                              (change-nth coord rotor (+ 1 power))
-                              (lambda (n) 0))
-              (aux rotor (+ coord 1))))))
-  (aux rotor 0))
-
-
-(check-equal? (next-rotor '(2 1 2)) '(3 1 2) "next-rotor")
-(check-equal? (next-rotor '(3 0 0)) '(0 1 0) "next-rotor")
-
-(define (mino-rotate mino rotor)
-  (map (lambda (point) (point-rotate point rotor)) mino)) 
-
-(check-equal? 
- (mino-rotate 
-  (make-mino (make-point 1 0 1) (make-point 0 0 1) (make-point 1 1 1) (make-point 1 2 1))
-  '(0 0 1))
- (make-mino (make-point 0 1 1) (make-point 0 0 1) (make-point -1 1 1) (make-point -2 1 1))
- "mino-rotate")
-
-(check-equal?
- (mino-rotate 
-  (make-mino 
-   (make-point 1 0 1) (make-point 0 0 1) (make-point 1 1 1) (make-point 1 2 1))
-  '(1 0 0))
- (make-mino (make-point 1 -1 0) (make-point 0 -1 0) (make-point 1 -1 1) (make-point 1 -1 2))
- "mino-rotate")
-
-(define (mino-shift mino shiftor)
-  (map (lambda (point) (point-shift point shiftor)) mino))
-
-(check-equal? 
- (mino-shift 
-  (make-mino (make-point 1 0 1) (make-point 0 0 1) (make-point 1 1 1) (make-point 1 2 1))
-  '(0 1 2))
- (make-mino (make-point 1 1 3) (make-point 0 1 3) (make-point 1 2 3) (make-point 1 3 3))
- "mino-shift")
-
-(define (mino-transform mino transformer)
-  (mino-shift 
-   (mino-rotate mino (transformer-rotor transformer))
-   (transformer-shiftor transformer)))
-
-(check-equal? 
- (mino-transform 
-  (make-mino (make-point 1 0 1) (make-point 0 0 1) (make-point 1 1 1) (make-point 1 2 1))
-  (make-transformer '(1 0 0) '(0 1 2)))
- (make-mino (make-point 1 0 2) (make-point 0 0 2) (make-point 1 0 3) (make-point 1 0 4))
- "mino-transform")
-
 (define (mino-next-transformer mino gamebox transformer)
   (let* ((rotor (transformer-rotor transformer))
          (rotated (mino-rotate mino rotor))
-         (next-shiftor (mino-next-shiftor rotated gamebox (transformer-shiftor transformer))))
+         (next-shiftor 
+          (mino-next-shiftor rotated gamebox (transformer-shiftor transformer))))
     (if (not (null? next-shiftor))
         (make-transformer  rotor next-shiftor)
-        (let* ((next-rotor (next-rotor rotor)))
+        (let ((next-rotor (mino-next-rotor rotor mino gamebox)))
           (if (null? next-rotor)
               null
-              (let* ((rotated (mino-rotate mino next-rotor))
-                     (next-shiftor (mino-init-shiftor rotated gamebox)))
-                (if (not (null? next-shiftor)) 
-                    (make-transformer next-rotor next-shiftor)
-                    (mino-next-transformer mino gamebox
-                                           (make-transformer next-rotor 
-                                                             (map - (box-upper-corner gamebox) 
-                                                                  (box-lower-corner (mino-box rotated))))))))))))
+              (make-transformer 
+               next-rotor 
+               (mino-init-shiftor (mino-rotate mino next-rotor) gamebox)))))))
 
 (check-equal?
  (mino-next-transformer
@@ -413,6 +455,12 @@
  '((0 1 0) (0 0 0))
  "mino-next-transformer")
  
+
+(define (mino-init-transformer mino gamebox)
+  (let ((init-rotor (mino-init-rotor mino gamebox)))
+    (make-transformer 
+     init-rotor 
+     (mino-init-shiftor (mino-rotate mino init-rotor) gamebox))))
 
 (check-equal? 
  (mino-init-transformer

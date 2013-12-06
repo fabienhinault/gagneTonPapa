@@ -580,3 +580,64 @@
  '((((1 1 1) (1 1 0) (1 0 1) (0 1 1)) ((0 0 0) (1 0 0) (0 1 0) (0 0 1))) ((0 1) (0 1) (0 1)) (((0 0 0) (1 0 0) (0 1 0) (0 0 1)) ((0 0 0) (1 0 0) (0 1 0) (0 0 1))) (((2 1 0) (1 1 1)) ((0 0 0) (0 0 0))))
   "solve 2x2x2")
  
+; I was not able to solve this one without writing this program.
+
+; *      **      **    *             *
+; *      *       *     **   **      **
+; ***    **     **     *    **      *
+
+;  5     7       8     C    E       D    names of the polynimos in the game "Gagne ton papa"
+
+
+;>  (solve (make-empty-puzzle 3 3 3) 
+;         (list
+;          (make-mino (make-point 0 0 0) 
+;                     (make-point 1 0 0) 
+;                     (make-point 2 0 0) 
+;                     (make-point 0 0 1)
+;                     (make-point 0 0 2))
+;          (make-mino (make-point 0 0 0)
+;                     (make-point 1 0 0) 
+;                     (make-point 0 0 1) 
+;                     (make-point 0 0 2) 
+;                     (make-point 1 0 2)
+;                     )
+;          (make-mino (make-point 0 0 0)
+;                     (make-point 1 0 0) 
+;                     (make-point 1 0 1) 
+;                     (make-point 1 0 2) 
+;                     (make-point 2 0 2)
+;                     )
+;          (make-mino (make-point 0 0 0)
+;                     (make-point 0 0 1) 
+;                     (make-point 0 0 2) 
+;                     (make-point 1 0 1))
+;          (make-mino (make-point 0 0 0)
+;                     (make-point 0 0 1) 
+;                     (make-point 1 0 1) 
+;                     (make-point 1 0 0))
+;          (make-mino (make-point 0 0 0)
+;                     (make-point 0 0 1) 
+;                     (make-point 1 0 1) 
+;                     (make-point 1 0 2))
+;          ))
+;
+;'((((1 0 2) (1 0 1) (1 1 1) (1 1 0))   ; placed polynimos
+;   ((0 1 0) (0 1 1) (0 2 1) (0 2 0))
+;   ((2 0 1) (2 1 1) (2 2 1) (2 1 0))
+;   ((2 0 2) (2 1 2) (1 1 2) (0 1 2) (0 2 2))
+;   ((1 2 0) (2 2 0) (1 2 1) (1 2 2) (2 2 2))
+;   ((0 0 0) (1 0 0) (2 0 0) (0 0 1) (0 0 2)))
+;  ((0 2) (0 2) (0 2))                  ; puzzle range
+;  (((0 0 0) (0 0 1) (1 0 1) (1 0 2))   ; original polynimos
+;   ((0 0 0) (0 0 1) (1 0 1) (1 0 0))
+;   ((0 0 0) (0 0 1) (0 0 2) (1 0 1))
+;   ((0 0 0) (1 0 0) (1 0 1) (1 0 2) (2 0 2))
+;   ((0 0 0) (1 0 0) (0 0 1) (0 0 2) (1 0 2))
+;   ((0 0 0) (1 0 0) (2 0 0) (0 0 1) (0 0 2)))
+;  (((0 2 1) (1 0 2))                   ; transforms
+;   ((0 0 1) (0 1 0)) 
+;   ((3 0 1) (2 0 1)) 
+;   ((3 1 0) (2 0 2)) 
+;   ((0 0 0) (1 2 0)) 
+;   ((0 0 0) (0 0 0))))
